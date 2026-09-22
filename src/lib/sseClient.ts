@@ -1,4 +1,4 @@
-import type { StreamEvent } from "./types";
+import type { StreamEvent } from "./types.js";
 
 export interface StreamHandle {
   /** Cancels the run. Safe to call repeatedly. */

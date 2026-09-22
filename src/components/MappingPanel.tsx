@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
-import { mapHeaders } from "../lib/mapHeaders";
-import { FIELDS } from "../lib/schema";
-import { useRun } from "../store/runStore";
-import type { ColumnMapping, FieldId } from "../lib/types";
+import { mapHeaders } from "../lib/mapHeaders.js";
+import { FIELDS } from "../lib/schema.js";
+import { useRun } from "../store/runStore.js";
+import type { ColumnMapping, FieldId } from "../lib/types.js";
 
 const VIA_LABEL: Record<ColumnMapping["via"], string> = {
   exact: "exact match",

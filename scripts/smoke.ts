@@ -10,8 +10,8 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseWorkbook } from "../src/lib/parse/sheet";
-import type { LocationRow, StreamEvent } from "../src/lib/types";
+import { parseWorkbook } from "../src/lib/parse/sheet.js";
+import type { LocationRow, StreamEvent } from "../src/lib/types.js";
 
 const BASE = process.env.SOV_BASE ?? "http://127.0.0.1:5173";
 const here = dirname(fileURLToPath(import.meta.url));

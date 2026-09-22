@@ -1,6 +1,6 @@
-import { FIELD_BY_ID } from "../lib/schema";
-import { useRun } from "../store/runStore";
-import type { SourceRef } from "../lib/types";
+import { FIELD_BY_ID } from "../lib/schema.js";
+import { useRun } from "../store/runStore.js";
+import type { SourceRef } from "../lib/types.js";
 
 function describeSource(source: SourceRef | null, raw: string): string {
   if (source?.kind === "sheet") return `${source.sheet} · cell ${source.a1}`;

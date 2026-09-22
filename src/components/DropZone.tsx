@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from "react";
-import { parseFile } from "../lib/parse";
-import { useRun } from "../store/runStore";
+import { parseFile } from "../lib/parse/index.js";
+import { useRun } from "../store/runStore.js";
 
 const SAMPLES = [
   { file: "01-clean.xlsx", label: "Clean template" },

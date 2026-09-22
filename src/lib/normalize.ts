@@ -1,6 +1,6 @@
-import { CONSTRUCTION_CLASSES, FIELD_BY_ID, FIELD_IDS, STATE_NAMES, US_STATES } from "./schema";
-import { mappingByField } from "./mapHeaders";
-import type { Cell, ColumnMapping, LocationRow, RawRow } from "./types";
+import { CONSTRUCTION_CLASSES, FIELD_BY_ID, FIELD_IDS, STATE_NAMES, US_STATES } from "./schema.js";
+import { mappingByField } from "./mapHeaders.js";
+import type { Cell, ColumnMapping, LocationRow, RawRow } from "./types.js";
 
 const EMPTY_TOKENS = new Set(["", "-", "--", "n/a", "na", "none", "null", "tbd", "?", "unknown"]);
 

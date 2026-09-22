@@ -1,6 +1,6 @@
-import { FIELD_BY_ID, FIELD_IDS } from "./schema";
-import { IGNORE_HEADERS, SCALE_HINTS, SYNONYMS } from "./synonyms";
-import type { ColumnMapping, FieldId, RawRow } from "./types";
+import { FIELD_BY_ID, FIELD_IDS } from "./schema.js";
+import { IGNORE_HEADERS, SCALE_HINTS, SYNONYMS } from "./synonyms.js";
+import type { ColumnMapping, FieldId, RawRow } from "./types.js";
 
 export function normalizeHeader(h: string): string {
   return h

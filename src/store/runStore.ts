@@ -1,6 +1,6 @@
 import { create } from "zustand";
-import { streamRun, type StreamHandle } from "../lib/sseClient";
-import { flagDuplicates, flagRow, summarize } from "../lib/flags";
+import { streamRun, type StreamHandle } from "../lib/sseClient.js";
+import { flagDuplicates, flagRow, summarize } from "../lib/flags.js";
 import type {
   Cell,
   ColumnMapping,
@@ -8,7 +8,7 @@ import type {
   Flag,
   LocationRow,
   ParsedFile,
-} from "../lib/types";
+} from "../lib/types.js";
 
 export type Phase = "idle" | "parsing" | "mapping" | "streaming" | "interrupted" | "done" | "error";
 

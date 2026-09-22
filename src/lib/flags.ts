@@ -1,5 +1,5 @@
-import { COPE_FIELDS, FIELD_BY_ID, US_STATES } from "./schema";
-import type { ColumnMapping, Flag, LocationRow } from "./types";
+import { COPE_FIELDS, FIELD_BY_ID, US_STATES } from "./schema.js";
+import type { ColumnMapping, Flag, LocationRow } from "./types.js";
 
 const CURRENT_YEAR = new Date().getFullYear();
 

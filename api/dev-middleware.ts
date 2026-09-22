@@ -1,6 +1,6 @@
 import type { Plugin } from "vite";
-import { handleExtract, handleStream, type MiniRes } from "./_handlers";
-import { nodeRes, readJson } from "./_node";
+import { handleExtract, handleStream, type MiniRes } from "./_handlers.js";
+import { nodeRes, readJson } from "./_node.js";
 
 /**
  * Serves the same handlers Vercel will run, inside `vite dev`, so there is one

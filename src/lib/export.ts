@@ -1,6 +1,6 @@
 import * as XLSX from "xlsx";
-import { FIELDS } from "./schema";
-import type { Flag, LocationRow } from "./types";
+import { FIELDS } from "./schema.js";
+import type { Flag, LocationRow } from "./types.js";
 
 function cellValue(row: LocationRow, field: (typeof FIELDS)[number]) {
   const cell = row[field.id];

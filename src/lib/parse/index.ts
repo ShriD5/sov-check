@@ -1,6 +1,6 @@
-import { parsePdf } from "./pdf";
-import { parseWorkbook } from "./sheet";
-import type { ParsedFile } from "../types";
+import { parsePdf } from "./pdf.js";
+import { parseWorkbook } from "./sheet.js";
+import type { ParsedFile } from "../types.js";
 
 export async function parseFile(file: File): Promise<ParsedFile> {
   const buffer = await file.arrayBuffer();

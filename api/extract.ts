@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { handleExtract, type MiniRes } from "./_handlers";
-import { nodeRes, readJson } from "./_node";
+import { handleExtract, type MiniRes } from "./_handlers.js";
+import { nodeRes, readJson } from "./_node.js";
 
 export const config = { runtime: "nodejs" };
 

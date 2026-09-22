@@ -1,7 +1,7 @@
-import { flagDuplicates, flagRow } from "./flags";
-import { mapHeaders } from "./mapHeaders";
-import { normalizeRow } from "./normalize";
-import type { ColumnMapping, ExtractRequest, Flag, LocationRow, StreamEvent } from "./types";
+import { flagDuplicates, flagRow } from "./flags.js";
+import { mapHeaders } from "./mapHeaders.js";
+import { normalizeRow } from "./normalize.js";
+import type { ColumnMapping, ExtractRequest, Flag, LocationRow, StreamEvent } from "./types.js";
 
 export interface EngineResult {
   mappings: ColumnMapping[];

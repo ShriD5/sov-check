@@ -1,4 +1,4 @@
-import type { FieldId } from "./types";
+import type { FieldId } from "./types.js";
 
 /**
  * Header synonyms seen across carrier, broker and MGA SOV templates.

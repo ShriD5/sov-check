@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { handleStream, type MiniRes } from "./_handlers";
-import { nodeRes } from "./_node";
+import { handleStream, type MiniRes } from "./_handlers.js";
+import { nodeRes } from "./_node.js";
 
 export const config = { runtime: "nodejs", maxDuration: 60 };
 

@@ -1,5 +1,5 @@
 import * as XLSX from "xlsx";
-import type { ParsedFile, RawRow, SourceRef } from "../types";
+import type { ParsedFile, RawRow, SourceRef } from "../types.js";
 
 /** Rows we scan looking for the real header row before giving up. */
 const HEADER_SEARCH_DEPTH = 12;

@@ -1,5 +1,5 @@
-import { buildEvents } from "../src/lib/engine";
-import type { ExtractRequest, StreamEvent } from "../src/lib/types";
+import { buildEvents } from "../src/lib/engine.js";
+import type { ExtractRequest, StreamEvent } from "../src/lib/types.js";
 
 export interface Run {
   id: string;

@@ -1,10 +1,10 @@
-import { DropZone } from "./components/DropZone";
-import { MappingPanel } from "./components/MappingPanel";
-import { ScheduleGrid } from "./components/ScheduleGrid";
-import { ChaosControls, RunBar, Timeline } from "./components/RunBar";
-import { FlagsPanel, SidePanel } from "./components/SidePanel";
-import { parseFile } from "./lib/parse";
-import { useRun } from "./store/runStore";
+import { DropZone } from "./components/DropZone.js";
+import { MappingPanel } from "./components/MappingPanel.js";
+import { ScheduleGrid } from "./components/ScheduleGrid.js";
+import { ChaosControls, RunBar, Timeline } from "./components/RunBar.js";
+import { FlagsPanel, SidePanel } from "./components/SidePanel.js";
+import { parseFile } from "./lib/parse/index.js";
+import { useRun } from "./store/runStore.js";
 
 function PendingFilePrompt() {
   const pending = useRun((s) => s.pendingFile);

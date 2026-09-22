@@ -1,4 +1,4 @@
-import type { FieldDef, FieldId } from "./types";
+import type { FieldDef, FieldId } from "./types.js";
 
 export const FIELDS: FieldDef[] = [
   { id: "location_id", label: "Loc #", kind: "string", group: "identity" },

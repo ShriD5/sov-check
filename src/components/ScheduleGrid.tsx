@@ -1,8 +1,8 @@
 import { useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { FIELDS } from "../lib/schema";
-import { useRun } from "../store/runStore";
-import type { Cell, FieldId, LocationRow } from "../lib/types";
+import { FIELDS } from "../lib/schema.js";
+import { useRun } from "../store/runStore.js";
+import type { Cell, FieldId, LocationRow } from "../lib/types.js";
 
 const COL_WIDTH: Partial<Record<FieldId, number>> = {
   location_id: 70,

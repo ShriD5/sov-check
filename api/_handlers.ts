@@ -1,5 +1,5 @@
-import { createRun, getRun } from "./_runs";
-import type { ExtractRequest } from "../src/lib/types";
+import { createRun, getRun } from "./_runs.js";
+import type { ExtractRequest } from "../src/lib/types.js";
 
 export interface MiniRes {
   status(code: number): void;

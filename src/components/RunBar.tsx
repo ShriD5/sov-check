@@ -1,5 +1,5 @@
-import { exportCsv, exportJson, exportXlsx } from "../lib/export";
-import { useRun, useSummary } from "../store/runStore";
+import { exportCsv, exportJson, exportXlsx } from "../lib/export.js";
+import { useRun, useSummary } from "../store/runStore.js";
 
 function money(n: number): string {
   if (n >= 1_000_000_000) return `$${(n / 1_000_000_000).toFixed(2)}B`;

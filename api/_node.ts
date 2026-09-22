@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import type { MiniRes } from "./_handlers";
+import type { MiniRes } from "./_handlers.js";
 
 /** Adapts a Node response to the tiny surface the handlers need. */
 export function nodeRes(res: ServerResponse): MiniRes {

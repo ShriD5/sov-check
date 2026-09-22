@@ -1,4 +1,4 @@
-import type { ParsedFile, RawRow, SourceRef } from "../types";
+import type { ParsedFile, RawRow, SourceRef } from "../types.js";
 
 interface Word {
   text: string;

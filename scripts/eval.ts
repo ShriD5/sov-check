@@ -1,10 +1,10 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { extractAll, buildEvents } from "../src/lib/engine";
-import { parseWorkbook } from "../src/lib/parse/sheet";
-import { extractFromPdfDocument, type PdfLikeDocument } from "../src/lib/parse/pdf";
-import type { LocationRow, ParsedFile, StreamEvent } from "../src/lib/types";
+import { extractAll, buildEvents } from "../src/lib/engine.js";
+import { parseWorkbook } from "../src/lib/parse/sheet.js";
+import { extractFromPdfDocument, type PdfLikeDocument } from "../src/lib/parse/pdf.js";
+import type { LocationRow, ParsedFile, StreamEvent } from "../src/lib/types.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const filesDir = join(here, "..", "fixtures", "files");

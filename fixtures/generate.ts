@@ -2,7 +2,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as XLSX from "xlsx";
-import { tableToPdf } from "./makePdf";
+import { tableToPdf } from "./makePdf.js";
 
 /**
  * Synthetic SOVs. Every address, insured and value here is invented.
