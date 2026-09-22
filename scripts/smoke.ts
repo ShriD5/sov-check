@@ -25,30 +25,25 @@ function load() {
   );
 }
 
-async function startRun(chaos: { drop?: number } = {}) {
+/** Reads one SSE connection to completion or death. Returns what it got. */
+async function readStream(lastEventId: number, chaos: { drop?: number } = {}) {
   const parsed = load();
-  const res = await fetch(`${BASE}/api/extract`, {
+  const res = await fetch(`${BASE}/api/stream`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      ...(lastEventId ? { "Last-Event-ID": String(lastEventId) } : {}),
+    },
     body: JSON.stringify({
       fileName: parsed.fileName,
       kind: parsed.kind,
       headers: parsed.headers,
       rows: parsed.rows,
+      lastEventId,
       chaosDropAfter: chaos.drop,
     }),
   });
-  if (!res.ok) throw new Error(`extract failed: ${res.status} ${await res.text()}`);
-  const { runId } = (await res.json()) as { runId: string };
-  return runId;
-}
-
-/** Reads one SSE connection to completion or death. Returns what it got. */
-async function readStream(runId: string, lastEventId: number) {
-  const res = await fetch(`${BASE}/api/stream?runId=${runId}&lastEventId=${lastEventId}`, {
-    headers: lastEventId ? { "Last-Event-ID": String(lastEventId) } : {},
-  });
-  if (!res.ok || !res.body) throw new Error(`stream failed: ${res.status}`);
+  if (!res.ok || !res.body) throw new Error(`stream failed: ${res.status} ${await res.text()}`);
 
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
@@ -87,21 +82,21 @@ async function main() {
   const checks: [string, boolean, string][] = [];
 
   // Clean run.
-  const cleanId = await startRun();
-  const clean = await readStream(cleanId, 0);
+  const clean = await readStream(0);
   checks.push(["clean run reaches done", clean.sawDone, `sawDone=${clean.sawDone}`]);
   checks.push(["clean run returns 21 rows", clean.rows.length === 21, `${clean.rows.length} rows`]);
 
   // Interrupted run: server kills the connection after 8 events.
-  const chaosId = await startRun({ drop: 8 });
-  const firstLeg = await readStream(chaosId, 0);
+  const firstLeg = await readStream(0, { drop: 8 });
   checks.push([
     "first leg dies without done",
     !firstLeg.sawDone && firstLeg.rows.length > 0,
     `${firstLeg.rows.length} rows, sawDone=${firstLeg.sawDone}`,
   ]);
 
-  const secondLeg = await readStream(chaosId, firstLeg.lastId);
+  // Resume lands on a different serverless instance than the first leg; the
+  // point of the stateless design is that this still works.
+  const secondLeg = await readStream(firstLeg.lastId);
   checks.push(["resumed leg reaches done", secondLeg.sawDone, `sawDone=${secondLeg.sawDone}`]);
 
   const stitched = [...firstLeg.rows, ...secondLeg.rows];
@@ -116,9 +111,13 @@ async function main() {
     `${stitched.length} vs ${clean.rows.length} rows`,
   ]);
 
-  // Expired or unknown run is a clean 404, not a hang.
-  const missing = await fetch(`${BASE}/api/stream?runId=run_nope`);
-  checks.push(["unknown run returns 404", missing.status === 404, `status ${missing.status}`]);
+  // A malformed body is a clean 400, not a hang.
+  const bad = await fetch(`${BASE}/api/stream`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ nonsense: true }),
+  });
+  checks.push(["malformed body returns 400", bad.status === 400, `status ${bad.status}`]);
 
   console.log("\nSOV Check smoke test against " + BASE + "\n");
   let failed = 0;

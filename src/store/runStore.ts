@@ -10,7 +10,14 @@ import type {
   ParsedFile,
 } from "../lib/types.js";
 
-export type Phase = "idle" | "parsing" | "mapping" | "streaming" | "interrupted" | "done" | "error";
+export type Phase =
+  | "idle"
+  | "parsing"
+  | "mapping"
+  | "streaming"
+  | "interrupted"
+  | "done"
+  | "error";
 
 interface TimelineEntry {
   at: number;
@@ -61,11 +68,27 @@ function log(kind: TimelineEntry["kind"], message: string): TimelineEntry {
 
 function coerce(field: FieldId, text: string, previous: Cell): Cell {
   const trimmed = text.trim();
-  if (trimmed === "") return { ...previous, value: null, raw: trimmed, edited: true, confidence: 1 };
+  if (trimmed === "")
+    return {
+      ...previous,
+      value: null,
+      raw: trimmed,
+      edited: true,
+      confidence: 1,
+    };
 
   const numeric = Number(trimmed.replace(/[$,\s]/g, ""));
   const looksNumeric = Number.isFinite(numeric) && /[\d]/.test(trimmed);
-  const isMoneyish = ["building_value", "contents_value", "bi_value", "tiv", "sq_ft", "stories", "year_built", "roof_year"].includes(field);
+  const isMoneyish = [
+    "building_value",
+    "contents_value",
+    "bi_value",
+    "tiv",
+    "sq_ft",
+    "stories",
+    "year_built",
+    "roof_year",
+  ].includes(field);
 
   return {
     ...previous,
@@ -106,7 +129,12 @@ export const useRun = create<RunState>((set, get) => ({
       edits: [],
       error: null,
       selected: null,
-      timeline: [log("info", `Parsed ${parsed.rows.length} rows from ${parsed.fileName}`)],
+      timeline: [
+        log(
+          "info",
+          `Parsed ${parsed.rows.length} rows from ${parsed.fileName}`,
+        ),
+      ],
     }),
 
   async start(parsed, mappings) {
@@ -126,67 +154,72 @@ export const useRun = create<RunState>((set, get) => ({
       ],
     });
 
-    const response = await fetch("/api/extract", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
+    const handle = streamRun(
+      {
         fileName: parsed.fileName,
         kind: parsed.kind,
         headers: parsed.headers,
         rows: parsed.rows,
         mappings,
-        chaosDropAfter: get().chaosDrop ? Math.ceil(parsed.rows.length / 3) : undefined,
-        chaosTruncateAfter: get().chaosTruncate ? Math.ceil(parsed.rows.length / 2) : undefined,
-      }),
-    });
-
-    if (!response.ok) {
-      const body = (await response.json().catch(() => ({}))) as { error?: string };
-      set({ phase: "error", error: body.error ?? `Extract failed (${response.status})` });
-      return;
-    }
-
-    const { runId } = (await response.json()) as { runId: string };
-
-    const handle = streamRun(runId, {
-      onEvent: (event) => {
-        if (event.type === "mapping") {
-          set({ mappings: event.mappings });
-          return;
-        }
-        if (event.type === "row") {
-          set((state) => ({ rows: [...state.rows, event.row], total: event.total }));
-          return;
-        }
-        if (event.type === "flags") {
-          set({ flags: event.flags });
-        }
+        chaosDropAfter: get().chaosDrop
+          ? Math.ceil(parsed.rows.length / 3)
+          : undefined,
+        chaosTruncateAfter: get().chaosTruncate
+          ? Math.ceil(parsed.rows.length / 2)
+          : undefined,
       },
-      onInterrupt: ({ lastEventId, attempt, reason }) =>
-        set((state) => ({
-          phase: "interrupted",
-          timeline: [
-            ...state.timeline,
-            log("warn", `${reason}. Retry ${attempt} from event ${lastEventId}, ${state.rows.length} rows already banked.`),
-          ],
-        })),
-      onResume: ({ lastEventId }) =>
-        set((state) => ({
-          phase: "streaming",
-          timeline: [...state.timeline, log("good", `Resumed at event ${lastEventId}, no rows re-sent`)],
-        })),
-      onDone: () =>
-        set((state) => ({
-          phase: "done",
-          timeline: [...state.timeline, log("good", `Schedule complete, ${state.rows.length} locations`)],
-        })),
-      onFatal: (message) =>
-        set((state) => ({
-          phase: "error",
-          error: message,
-          timeline: [...state.timeline, log("warn", message)],
-        })),
-    });
+      {
+        onEvent: (event) => {
+          if (event.type === "mapping") {
+            set({ mappings: event.mappings });
+            return;
+          }
+          if (event.type === "row") {
+            set((state) => ({
+              rows: [...state.rows, event.row],
+              total: event.total,
+            }));
+            return;
+          }
+          if (event.type === "flags") {
+            set({ flags: event.flags });
+          }
+        },
+        onInterrupt: ({ lastEventId, attempt, reason }) =>
+          set((state) => ({
+            phase: "interrupted",
+            timeline: [
+              ...state.timeline,
+              log(
+                "warn",
+                `${reason}. Retry ${attempt} from event ${lastEventId}, ${state.rows.length} rows already banked.`,
+              ),
+            ],
+          })),
+        onResume: ({ lastEventId }) =>
+          set((state) => ({
+            phase: "streaming",
+            timeline: [
+              ...state.timeline,
+              log("good", `Resumed at event ${lastEventId}, no rows re-sent`),
+            ],
+          })),
+        onDone: () =>
+          set((state) => ({
+            phase: "done",
+            timeline: [
+              ...state.timeline,
+              log("good", `Schedule complete, ${state.rows.length} locations`),
+            ],
+          })),
+        onFatal: (message) =>
+          set((state) => ({
+            phase: "error",
+            error: message,
+            timeline: [...state.timeline, log("warn", message)],
+          })),
+      },
+    );
 
     set({ handle });
   },
@@ -211,13 +244,19 @@ export const useRun = create<RunState>((set, get) => ({
     const before = row[field];
     const after = coerce(field, nextValue, before);
 
-    const rows = state.rows.map((r) => (r.key === rowKey ? { ...r, [field]: after } : r));
+    const rows = state.rows.map((r) =>
+      r.key === rowKey ? { ...r, [field]: after } : r,
+    );
     const flags = [
       ...rows.flatMap((r) => flagRow(r, state.mappings)),
       ...flagDuplicates(rows),
     ];
 
-    set({ rows, flags, edits: [...state.edits, { rowKey, field, before, after }] });
+    set({
+      rows,
+      flags,
+      edits: [...state.edits, { rowKey, field, before, after }],
+    });
   },
 
   undo() {
@@ -225,7 +264,9 @@ export const useRun = create<RunState>((set, get) => ({
     const last = state.edits[state.edits.length - 1];
     if (!last) return;
 
-    const rows = state.rows.map((r) => (r.key === last.rowKey ? { ...r, [last.field]: last.before } : r));
+    const rows = state.rows.map((r) =>
+      r.key === last.rowKey ? { ...r, [last.field]: last.before } : r,
+    );
     const flags = [
       ...rows.flatMap((r) => flagRow(r, state.mappings)),
       ...flagDuplicates(rows),

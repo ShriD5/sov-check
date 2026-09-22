@@ -1,4 +1,4 @@
-import type { StreamEvent } from "./types.js";
+import type { ExtractRequest, StreamEvent } from "./types.js";
 
 export interface StreamHandle {
   /** Cancels the run. Safe to call repeatedly. */
@@ -18,12 +18,12 @@ const MAX_ATTEMPTS = 6;
 const BASE_BACKOFF_MS = 400;
 
 /**
- * SSE over fetch rather than EventSource, for three reasons the browser API
- * cannot give us: an AbortController so a superseded run stops immediately,
- * an explicit Last-Event-ID we control on every retry, and a bounded backoff
- * instead of EventSource's infinite reconnect.
+ * SSE over fetch rather than EventSource, for four things the browser API
+ * cannot give us: a POST body, an AbortController so a superseded run stops
+ * immediately, an explicit Last-Event-ID we control on every retry, and a
+ * bounded backoff instead of an infinite reconnect loop.
  */
-export function streamRun(runId: string, callbacks: StreamCallbacks): StreamHandle {
+export function streamRun(payload: ExtractRequest, callbacks: StreamCallbacks): StreamHandle {
   let cancelled = false;
   let lastEventId = 0;
   let attempt = 0;
@@ -42,20 +42,24 @@ export function streamRun(runId: string, callbacks: StreamCallbacks): StreamHand
     let sawTerminal = false;
 
     try {
-      const response = await fetch(
-        `/api/stream?runId=${encodeURIComponent(runId)}&lastEventId=${lastEventId}`,
-        {
-          signal: controller.signal,
-          headers: lastEventId > 0 ? { "Last-Event-ID": String(lastEventId) } : {},
+      const response = await fetch("/api/stream", {
+        method: "POST",
+        signal: controller.signal,
+        headers: {
+          "content-type": "application/json",
+          ...(lastEventId > 0 ? { "Last-Event-ID": String(lastEventId) } : {}),
         },
-      );
+        body: JSON.stringify({ ...payload, lastEventId }),
+      });
 
-      if (response.status === 404) {
-        callbacks.onFatal("That run expired on the server. Drop the file again.");
-        return;
-      }
       if (!response.ok || !response.body) {
-        throw new Error(`Stream responded ${response.status}`);
+        const detail = await response.json().catch(() => null);
+        const message = (detail as { error?: string } | null)?.error;
+        if (response.status === 400 || response.status === 413) {
+          callbacks.onFatal(message ?? `Server rejected the schedule (${response.status})`);
+          return;
+        }
+        throw new Error(message ?? `Stream responded ${response.status}`);
       }
 
       if (attempt > 0) callbacks.onResume({ lastEventId, attempt });
@@ -90,7 +94,8 @@ export function streamRun(runId: string, callbacks: StreamCallbacks): StreamHand
           lastEventId = id;
 
           if (event.type === "error" && event.retryable) {
-            // Server truncated itself. Not fatal: reconnect and continue.
+            // The model truncated itself. Not fatal: reconnect and continue
+            // from this id rather than starting the schedule again.
             throw new Error(event.message);
           }
 
@@ -125,8 +130,7 @@ export function streamRun(runId: string, callbacks: StreamCallbacks): StreamHand
       }
 
       callbacks.onInterrupt({ lastEventId, attempt, reason });
-      const backoff = BASE_BACKOFF_MS * 2 ** (attempt - 1);
-      await new Promise((r) => setTimeout(r, Math.min(backoff, 4000)));
+      await new Promise((r) => setTimeout(r, Math.min(BASE_BACKOFF_MS * 2 ** (attempt - 1), 4000)));
       return connect();
     }
   };
