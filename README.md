@@ -51,14 +51,22 @@ with the "break it on purpose" toggles on the landing page.
 | Model output truncates | Server emits a retryable error, client treats it as a continuation and reconnects from its last id. |
 | Second file dropped mid-run | The run is not silently replaced. You are asked whether to cancel it or keep it, and cancel aborts the fetch immediately. |
 
-Event ids are 1-based and index directly into the run's event list, so a resume
-is an array slice, not a replay of work already done. That is why a resumed
+Event ids are 1-based and index directly into the event list, so a resume is
+an array slice, not a replay of work already done. That is why a resumed
 schedule is byte-identical to one that never broke, which the eval asserts.
 
-SSE is consumed over `fetch` rather than `EventSource`, for three things the
-browser API will not give you: an `AbortController` so a superseded run stops
-immediately, an explicit `Last-Event-ID` on every retry, and a bounded backoff
-instead of an infinite reconnect loop.
+**The stream is deliberately stateless.** The first version held each run in
+server memory and resumed by run id, which worked locally and broke in
+production the moment a reconnect landed on a different serverless instance.
+Because extraction is deterministic, the same input always produces the same
+ordered event list, so the client re-sends the rows with its `lastEventId` and
+the server slices from there. That costs a re-POST per retry and buys a resume
+that survives cold starts, instance changes and redeploys.
+
+SSE is consumed over `fetch` rather than `EventSource`, for four things the
+browser API will not give you: a POST body, an `AbortController` so a
+superseded run stops immediately, an explicit `Last-Event-ID` on every retry,
+and a bounded backoff instead of an infinite reconnect loop.
 
 ## Numbers
 
@@ -109,9 +117,10 @@ npm run eval       # accuracy + chaos harness
 npm run build
 ```
 
-With the dev server up, `npx tsx scripts/smoke.ts` exercises the real wire
-protocol: starts a run, has the server kill the connection after eight events,
-reconnects, and asserts no duplicate rows and an identical schedule.
+`npx tsx scripts/smoke.ts` exercises the real wire protocol against a running
+server: starts a run, has the server kill the connection after eight events,
+reconnects, and asserts no duplicate rows and an identical schedule. Point it
+at production with `SOV_BASE=https://sov-check.vercel.app`.
 
 ## Architecture
 
@@ -129,9 +138,8 @@ src/lib/
   parse/          SheetJS for workbooks, pdf.js with column geometry for PDFs
 
 api/
-  extract.ts      POST -> run id, builds the event list
-  stream.ts       GET  -> SSE, resumable by event id
-  _runs.ts        in-memory runs, 15 minute TTL, nothing written to disk
+  stream.ts       POST -> SSE, stateless, resumable by event id
+  _handlers.ts    the handler, shared by Vercel and the vite dev middleware
 ```
 
 The PDF path infers column boundaries from the header line's word positions
@@ -141,7 +149,7 @@ shifts every later value one column over if you do not.
 ## What it does not do
 
 - No geocoding, no third-party enrichment, no hazard scores.
-- No accounts, no persistence. A run lives in memory for 15 minutes.
+- No accounts, no persistence, no database. Nothing is stored between requests.
 - No LLM in the default path. The mapper is deterministic, so the tool costs
   nothing to run and cannot hallucinate a column. `ANTHROPIC_API_KEY` is
   reserved for a future fallback on the columns it currently defers.
@@ -151,6 +159,6 @@ shifts every later value one column over if you do not.
 ## Privacy
 
 Files are parsed in the browser. Only the extracted rows are POSTed, and only
-so the server can stream them back normalized. Runs are held in memory for at
-most 15 minutes and are never written to disk or a database. There is no
-analytics, no account, and nothing to log in to.
+so the server can stream them back normalized. The server holds nothing
+between requests: no database, no disk, no cache. There is no analytics, no
+account, and nothing to log in to.
