@@ -1,0 +1,237 @@
+{
+  "locations": 21,
+  "tiv": 207090000,
+  "rows": [
+    {
+      "address": "4120 Beacon Industrial Way",
+      "state": "TX",
+      "zip": "75050",
+      "year_built": 1998,
+      "sq_ft": 84000,
+      "construction": "4 Masonry non-combustible",
+      "building_value": 6250000,
+      "contents_value": 1800000,
+      "tiv": 9000000
+    },
+    {
+      "address": "9 Harborview Terrace",
+      "state": "RI",
+      "zip": "02903",
+      "year_built": 1926,
+      "sq_ft": 31500,
+      "construction": "2 Joisted masonry",
+      "building_value": 4100000,
+      "contents_value": 620000,
+      "tiv": 5200000
+    },
+    {
+      "address": "2255 Camelback Commerce Dr",
+      "state": "AZ",
+      "zip": "85015",
+      "year_built": 2014,
+      "sq_ft": 46200,
+      "construction": "3 Non-combustible",
+      "building_value": 7800000,
+      "contents_value": 3400000,
+      "tiv": 13300000
+    },
+    {
+      "address": "2255 Camelback Commerce Dr",
+      "state": "AZ",
+      "zip": "85015",
+      "year_built": 2019,
+      "sq_ft": 12800,
+      "construction": "3 Non-combustible",
+      "building_value": 1450000,
+      "contents_value": 310000,
+      "tiv": 1760000
+    },
+    {
+      "address": "781 Willow Creek Rd",
+      "state": "ID",
+      "zip": "83702",
+      "year_built": 1974,
+      "sq_ft": 22400,
+      "construction": "1 Frame",
+      "building_value": 2350000,
+      "contents_value": 890000,
+      "tiv": 3780000
+    },
+    {
+      "address": "1600 Riverbend Pkwy",
+      "state": "TN",
+      "zip": "37406",
+      "year_built": 2003,
+      "sq_ft": 118000,
+      "construction": "4 Masonry non-combustible",
+      "building_value": 9600000,
+      "contents_value": 5200000,
+      "tiv": 17900000
+    },
+    {
+      "address": "58 Fairmount Ave",
+      "state": "MA",
+      "zip": "01604",
+      "year_built": 1951,
+      "sq_ft": 27800,
+      "construction": "2 Joisted masonry",
+      "building_value": 3300000,
+      "contents_value": 740000,
+      "tiv": 4650000
+    },
+    {
+      "address": "3405 Sunfield Blvd",
+      "state": "FL",
+      "zip": "34474",
+      "year_built": 2008,
+      "sq_ft": 39500,
+      "construction": "4 Masonry non-combustible",
+      "building_value": 4750000,
+      "contents_value": 1950000,
+      "tiv": 7580000
+    },
+    {
+      "address": "22 Kestrel Point",
+      "state": "OR",
+      "zip": "97701",
+      "year_built": 1989,
+      "sq_ft": 18600,
+      "construction": "1 Frame",
+      "building_value": 1980000,
+      "contents_value": 430000,
+      "tiv": 2670000
+    },
+    {
+      "address": "700 Steelyard Row",
+      "state": "IN",
+      "zip": "46402",
+      "year_built": 1962,
+      "sq_ft": 96400,
+      "construction": "3 Non-combustible",
+      "building_value": 8200000,
+      "contents_value": 6900000,
+      "tiv": 19500000
+    },
+    {
+      "address": "145 Alder Grove Ln",
+      "state": "WA",
+      "zip": "98225",
+      "year_built": 2017,
+      "sq_ft": 52300,
+      "construction": "6 Fire resistive",
+      "building_value": 11200000,
+      "contents_value": 2300000,
+      "tiv": 15250000
+    },
+    {
+      "address": "8801 Prairie Vista Ct",
+      "state": "NE",
+      "zip": "68512",
+      "year_built": 1995,
+      "sq_ft": 64100,
+      "construction": "4 Masonry non-combustible",
+      "building_value": 5400000,
+      "contents_value": 4100000,
+      "tiv": 12100000
+    },
+    {
+      "address": "37 Quarry Hill Rd",
+      "state": "VT",
+      "zip": "05641",
+      "year_built": 1938,
+      "sq_ft": 14900,
+      "construction": "2 Joisted masonry",
+      "building_value": 1240000,
+      "contents_value": 380000,
+      "tiv": 1810000
+    },
+    {
+      "address": "512 Copperline Dr",
+      "state": "AZ",
+      "zip": "85281",
+      "year_built": 2011,
+      "sq_ft": 73600,
+      "construction": "6 Fire resistive",
+      "building_value": 14600000,
+      "contents_value": 3900000,
+      "tiv": 23700000
+    },
+    {
+      "address": "1919 Saltgrass Rd",
+      "state": "TX",
+      "zip": "77701",
+      "year_built": 1979,
+      "sq_ft": 41200,
+      "construction": "3 Non-combustible",
+      "building_value": 3850000,
+      "contents_value": 2100000,
+      "tiv": 7100000
+    },
+    {
+      "address": "64 Lantern Mill Way",
+      "state": "NH",
+      "zip": "03060",
+      "year_built": 2001,
+      "sq_ft": 29300,
+      "construction": "4 Masonry non-combustible",
+      "building_value": 6100000,
+      "contents_value": 4700000,
+      "tiv": 13750000
+    },
+    {
+      "address": "230 Cedar Bluff Pass",
+      "state": "TN",
+      "zip": "37923",
+      "year_built": 1986,
+      "sq_ft": 33800,
+      "construction": "1 Frame",
+      "building_value": 2680000,
+      "contents_value": 1020000,
+      "tiv": 4170000
+    },
+    {
+      "address": "4455 Dunes Harbor Blvd",
+      "state": "TX",
+      "zip": "78411",
+      "year_built": 2006,
+      "sq_ft": 57400,
+      "construction": "4 Masonry non-combustible",
+      "building_value": 9100000,
+      "contents_value": 2400000,
+      "tiv": 14800000
+    },
+    {
+      "address": "12 Foundry Yard",
+      "state": "PA",
+      "zip": "16507",
+      "year_built": 1948,
+      "sq_ft": 45700,
+      "construction": "2 Joisted masonry",
+      "building_value": 4300000,
+      "contents_value": 3100000,
+      "tiv": 9300000
+    },
+    {
+      "address": "905 Summit Ridge Ct",
+      "state": "CO",
+      "zip": "80906",
+      "year_built": 2015,
+      "sq_ft": 26500,
+      "construction": "3 Non-combustible",
+      "building_value": 4900000,
+      "contents_value": 1100000,
+      "tiv": 6820000
+    },
+    {
+      "address": "3377 Marsh Landing Dr",
+      "state": "GA",
+      "zip": "31408",
+      "year_built": 1993,
+      "sq_ft": 88200,
+      "construction": "4 Masonry non-combustible",
+      "building_value": 7300000,
+      "contents_value": 3600000,
+      "tiv": 12950000
+    }
+  ]
+}
