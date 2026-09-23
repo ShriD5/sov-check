@@ -1,6 +1,6 @@
 import type { Plugin } from "vite";
 import { handleStream, type MiniRes } from "./_handlers.js";
-import { nodeRes, readJson } from "./_node.js";
+import { lastEventIdOf, nodeRes, readJson } from "./_node.js";
 
 /**
  * Serves the same handler Vercel will run, inside `vite dev`, so there is one
@@ -21,8 +21,15 @@ export function devApi(): Plugin {
           return;
         }
 
-        const body = await readJson(req);
-        handleStream(body, mini);
+        let body: unknown;
+        try {
+          body = await readJson(req);
+        } catch {
+          mini.status(413);
+          mini.end(JSON.stringify({ error: "That file is too large for this demo." }));
+          return;
+        }
+        handleStream(body, mini, lastEventIdOf(req));
       });
     },
   };

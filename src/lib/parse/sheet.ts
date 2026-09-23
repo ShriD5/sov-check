@@ -1,5 +1,5 @@
 import * as XLSX from "xlsx";
-import type { ParsedFile, RawRow, SourceRef } from "../types.js";
+import type { ParsedFile, RawRow, SourceRef, SourceSubtotal } from "../types.js";
 
 /** Rows we scan looking for the real header row before giving up. */
 const HEADER_SEARCH_DEPTH = 12;
@@ -96,12 +96,14 @@ export function parseWorkbook(buffer: ArrayBuffer, fileName: string): ParsedFile
   const notes: string[] = [];
   const rows: RawRow[] = [];
   const headerUnion: string[] = [];
+  const subtotals: SourceSubtotal[] = [];
   let ordinal = 0;
   let droppedTotals = 0;
 
   for (const sheetName of wb.SheetNames) {
     const sheet = wb.Sheets[sheetName];
     if (!sheet) continue;
+    let blockStart = ordinal;
 
     const matrix = XLSX.utils.sheet_to_json<Matrix[number]>(sheet, {
       header: 1,
@@ -127,6 +129,20 @@ export function parseWorkbook(buffer: ArrayBuffer, fileName: string): ParsedFile
       if (isBlankRow(row)) continue;
       if (isTotalRow(row)) {
         droppedTotals++;
+        const texts = row.map(cellText);
+        const amounts = texts
+          .map((t) => Number(t.replace(/[$,()\s]/g, "")))
+          .filter((n) => Number.isFinite(n) && n > 0);
+        if (amounts.length && ordinal > blockStart) {
+          subtotals.push({
+            label: texts.find((t) => /total|sum/i.test(t)) ?? "Total",
+            amounts,
+            startRow: blockStart,
+            endRow: ordinal,
+            where: `${sheetName}, row ${r + 1}`,
+          });
+          blockStart = ordinal;
+        }
         continue;
       }
 
@@ -153,7 +169,9 @@ export function parseWorkbook(buffer: ArrayBuffer, fileName: string): ParsedFile
     }
   }
 
-  if (droppedTotals) notes.push(`${droppedTotals} total/subtotal row(s) excluded from the schedule`);
+  if (droppedTotals) {
+    notes.push(`${droppedTotals} total/subtotal row(s) excluded from the schedule and kept for reconciliation`);
+  }
   if (wb.SheetNames.length > 1) notes.push(`${wb.SheetNames.length} sheets combined into one schedule`);
 
   return {
@@ -163,5 +181,6 @@ export function parseWorkbook(buffer: ArrayBuffer, fileName: string): ParsedFile
     headers: headerUnion,
     rows,
     notes,
+    subtotals,
   };
 }

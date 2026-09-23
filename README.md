@@ -32,9 +32,12 @@ that does the first mile of it and shows its work.
   a leading zero to Excel, two-digit years.
 - **Derives TIV** from building + contents + BI when the file has no total, and
   refuses to derive it from contents alone.
-- **Flags** missing COPE, TIV that does not add up, duplicate locations,
-  impossible years, invalid states and zips, implausible areas, and any column
-  it mapped at low confidence.
+- **Flags** missing COPE, TIV that does not add up, identical rows,
+  impossible years, invalid states and zips, a zip that belongs to another
+  state, zero TIV, value per square foot far outside the schedule's own
+  median, and any column it mapped at low confidence.
+- **Ties out** to any totals and subtotals printed in the source, the way an
+  underwriter reconciles a schedule before trusting it.
 - **Cites everything**: click a cell to see the sheet and cell reference, the
   raw text, and the confidence. Export carries a Provenance sheet.
 - **Survives a broken stream** (below).
@@ -68,7 +71,58 @@ browser API will not give you: a POST body, an `AbortController` so a
 superseded run stops immediately, an explicit `Last-Event-ID` on every retry,
 and a bounded backoff instead of an infinite reconnect loop.
 
-## Numbers
+## On real documents
+
+Synthetic fixtures only prove a tool agrees with the person who wrote them. So
+the tool also runs on Statements of Values that governments publish with their
+insurance RFPs. Nothing here was tuned against an answer key, because there
+isn't one. The check is harder than that: the document's own printed totals.
+
+| Source | What it is | Result |
+|---|---|---|
+| [State of Mississippi](https://www.dfa.ms.gov/sites/default/files/State%20Property%20Insurance%20Home/EIS%20SOV%20Report%2009102026.pdf) | 79-page PDF, 3,861 buildings, $8.07B TIV | **49 of 49 department subtotals reproduced to the dollar.** 217 value-density outliers, 168 identical rows, 32 zero-TIV rows surfaced. |
+| [Town of Ware, MA](https://cms1files.revize.com/warema/2-Town%20of%20Ware%20RFQ%20Insurance%20Addendum%201%2003-05-2024.pdf) | SOV on page 2 of a 150-page RFQ packet with property cards and loss runs | 62 buildings, $177M. Finds the one page that is the SOV and skips the other 149. **Catches a real typo:** five buildings at 4 Gould Road are listed at zip 10182 (New York) instead of 01082. |
+| [Atlanta Housing](https://www.atlantahousing.org/wp-content/uploads/2024/04/RFP-2024-0115-Insurance-Broker-and-Related-Services-Addendum-1-Pckg-1.pdf) | RFP addendum with a coverage table and an attendee list, no SOV | Zero rows. A negative control: tables that are not schedules produce nothing rather than garbage. |
+
+`npm run real` downloads these and prints what the pipeline made of each. Both
+real SOVs are also one click away on the live site.
+
+**What the real files broke, and what changed.** The first run on real data
+parsed Mississippi's addresses into the wrong column, glued three of Ware's
+headers into one, and raised 12,279 warnings on Mississippi alone. Each fix is
+in the code with a comment pointing at the file that forced it:
+
+- **Column geometry.** Real PDFs centre headers over left-aligned text and
+  right-aligned money. Columns are now assigned by overlap with the header,
+  then re-learned from where each column's data actually sits. The county
+  "Lee" sits 3pt from one header and 4pt from the other; header geometry alone
+  got it wrong by a point.
+- **Two-tier headers in PDFs.** "Square" printed above "Footage" is one column.
+- **Construction classes.** "Masonry Noncombustible" was matching bare
+  "masonry" first and landing in class 2 instead of class 4. Phrases are now
+  compared squashed and longest first.
+- **Duplicates.** Ware lists a high school, press box, concession stand and
+  field lights all at 237 West Street. Those are four buildings on one campus,
+  not duplicates. A duplicate now has to match on address, building,
+  description, area and value.
+- **Value per square foot, judged against the schedule.** A fixed "under 400
+  sq ft is suspicious" rule fired 819 times on real sheds, silos and pavilions.
+  Relative to the schedule's own median ($110/sq ft), the same file surfaces
+  a 96 sq ft guard office carrying $3.6M.
+- **Columns the file never had.** Mississippi has no year built, construction
+  or sprinkler column. That is one fact about the file, reported once, not
+  11,861 row-level warnings.
+- **Truncated values.** The Mississippi report prints the state as "Missi" in
+  places. A prefix that fits exactly one state name resolves to it.
+- **Request size.** Mississippi is 4.0MB of JSON, just under the platform's
+  4.5MB request limit, and a resume re-sends it. The client gzips it once
+  (0.31MB) and reuses the same bytes on every retry.
+
+With a server dropping the connection at row 1,200, the Mississippi run
+resumes and finishes identical to the uninterrupted one, still tying out 49/49.
+`npm run smoke` asserts all of that against local or production.
+
+## Numbers on synthetic fixtures
 
 `npm run eval` runs seven synthetic fixtures through the same code path the app
 uses, then cuts each stream at three points and compares the result to the
@@ -88,6 +142,7 @@ uninterrupted run.
   Wrong answers                                 0
   Columns handed back for mapping               11/97
   Expected flags raised                         3/3
+  Source totals tied out to the dollar          1/1
   Chaos resume identical to clean run           21/21
 ```
 
@@ -102,7 +157,8 @@ of thirteen columns and hands back eleven. That is the intended behaviour, and
 it is why the headline is 87% coverage rather than a rounder number.
 
 These fixtures are synthetic and the expectations were written alongside them,
-so treat this as a regression guard, not a benchmark against real submissions.
+so treat this as a regression guard. The real-document section above is the
+evidence.
 It has still caught real bugs: "Rein**state**ment Value" matching the `state`
 synonym by raw substring, and `Building Value ($000s)` mapping to the building
 *number* column because a shorter synonym scored equal and won on field order.
@@ -113,7 +169,9 @@ synonym by raw substring, and `Building Value ($000s)` mapping to the building
 npm install
 npm run fixtures   # regenerate the synthetic SOVs
 npm run dev        # http://localhost:5173
-npm run eval       # accuracy + chaos harness
+npm run eval       # accuracy + chaos harness on synthetic fixtures
+npm run real       # fetch the public SOVs and run them
+npm run smoke      # wire protocol, resume and tie-out against a running server
 npm run build
 ```
 

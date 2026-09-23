@@ -2,6 +2,23 @@ import { useCallback, useRef, useState } from "react";
 import { parseFile } from "../lib/parse/index.js";
 import { useRun } from "../store/runStore.js";
 
+const REAL_SAMPLES = [
+  {
+    file: "state-of-mississippi-sov.pdf",
+    label: "State of Mississippi",
+    detail: "3,861 buildings, 79 pages",
+    source:
+      "https://www.dfa.ms.gov/sites/default/files/State%20Property%20Insurance%20Home/EIS%20SOV%20Report%2009102026.pdf",
+  },
+  {
+    file: "town-of-ware-ma-rfq.pdf",
+    label: "Town of Ware, MA",
+    detail: "SOV buried in a 150-page RFQ",
+    source:
+      "https://cms1files.revize.com/warema/2-Town%20of%20Ware%20RFQ%20Insurance%20Addendum%201%2003-05-2024.pdf",
+  },
+];
+
 const SAMPLES = [
   { file: "01-clean.xlsx", label: "Clean template" },
   { file: "02-merged-header.xlsx", label: "Two-tier header" },
@@ -14,6 +31,7 @@ const SAMPLES = [
 export function DropZone() {
   const [dragging, setDragging] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState<{ page: number; pages: number } | null>(null);
   const input = useRef<HTMLInputElement>(null);
   const setParsed = useRun((s) => s.setParsed);
   const setPhase = useRun((s) => s.setPhase);
@@ -31,7 +49,7 @@ export function DropZone() {
       setBusy(true);
       setPhase("parsing");
       try {
-        const parsed = await parseFile(file);
+        const parsed = await parseFile(file, (page, pages) => setProgress({ page, pages }));
         if (!parsed.rows.length) throw new Error("No data rows found. Is the header row missing?");
         setParsed(parsed);
       } catch (error) {
@@ -41,6 +59,7 @@ export function DropZone() {
         });
       } finally {
         setBusy(false);
+        setProgress(null);
       }
     },
     [phase, setParsed, setPendingFile, setPhase],
@@ -97,7 +116,11 @@ export function DropZone() {
           }}
         />
         <p className="text-lg font-medium">
-          {busy ? "Reading the file..." : "Drop a Statement of Values"}
+          {progress
+            ? `Reading page ${progress.page} of ${progress.pages}...`
+            : busy
+              ? "Reading the file..."
+              : "Drop a Statement of Values"}
         </p>
         <p className="mt-2 text-sm text-[var(--color-muted)]">
           .xlsx, .xls, .csv or .pdf. Parsed in your browser, nothing is stored.
@@ -106,7 +129,38 @@ export function DropZone() {
 
       <div className="mt-6">
         <p className="text-xs uppercase tracking-wider text-[var(--color-muted)]">
-          Or try a sample
+          Real public SOVs, published with insurance RFPs
+        </p>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          {REAL_SAMPLES.map((sample) => (
+            <div
+              key={sample.file}
+              className="flex items-center justify-between rounded-md border border-[var(--color-line)] bg-[var(--color-panel)] px-3 py-2"
+            >
+              <button
+                onClick={() => void loadSample(sample.file)}
+                disabled={busy}
+                className="text-left disabled:opacity-50"
+              >
+                <span className="block text-sm text-white hover:text-[var(--color-accent)]">{sample.label}</span>
+                <span className="block text-xs text-[var(--color-muted)]">{sample.detail}</span>
+              </button>
+              <a
+                href={sample.source}
+                target="_blank"
+                rel="noreferrer"
+                className="ml-3 shrink-0 text-xs text-[var(--color-muted)] underline-offset-2 hover:text-white hover:underline"
+              >
+                original
+              </a>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-6">
+        <p className="text-xs uppercase tracking-wider text-[var(--color-muted)]">
+          Synthetic edge cases
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
           {SAMPLES.map((sample) => (

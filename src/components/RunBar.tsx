@@ -14,6 +14,8 @@ export function RunBar() {
   const total = useRun((s) => s.total);
   const file = useRun((s) => s.file);
   const edits = useRun((s) => s.edits);
+  const reconciliation = useRun((s) => s.reconciliation);
+  const tied = reconciliation.filter((r) => r.matched).length;
   const undo = useRun((s) => s.undo);
   const cancel = useRun((s) => s.cancel);
   const reset = useRun((s) => s.reset);
@@ -34,6 +36,13 @@ export function RunBar() {
         />
         <Stat label="Errors" value={String(summary.errors)} tone={summary.errors ? "bad" : "good"} />
         <Stat label="Warnings" value={String(summary.warnings)} tone={summary.warnings ? "warn" : "good"} />
+        {reconciliation.length > 0 && (
+          <Stat
+            label="Ties to source totals"
+            value={`${tied}/${reconciliation.length}`}
+            tone={tied === reconciliation.length ? "good" : "bad"}
+          />
+        )}
       </div>
 
       <div className="flex items-center gap-2">

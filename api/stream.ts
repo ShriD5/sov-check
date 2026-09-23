@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { handleStream, type MiniRes } from "./_handlers.js";
-import { nodeRes, readJson } from "./_node.js";
+import { lastEventIdOf, nodeRes, readJson } from "./_node.js";
 
 export const config = { maxDuration: 60 };
 
@@ -14,6 +14,15 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     return;
   }
 
-  const body = await readJson(req);
-  handleStream(body, mini);
+  let body: unknown;
+  try {
+    body = await readJson(req);
+  } catch {
+    mini.status(413);
+    mini.header("content-type", "application/json");
+    mini.end(JSON.stringify({ error: "That file is too large for this demo." }));
+    return;
+  }
+
+  handleStream(body, mini, lastEventIdOf(req));
 }

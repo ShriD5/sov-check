@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { streamRun, type StreamHandle } from "../lib/sseClient.js";
-import { flagDuplicates, flagRow, summarize } from "../lib/flags.js";
+import { flagAcrossRows, flagRow, reconcile, summarize } from "../lib/flags.js";
+import { hydrateRow, type WireRow } from "../lib/wire.js";
 import type {
   Cell,
   ColumnMapping,
@@ -8,6 +9,8 @@ import type {
   Flag,
   LocationRow,
   ParsedFile,
+  Reconciliation,
+  SourceSubtotal,
 } from "../lib/types.js";
 
 export type Phase =
@@ -38,6 +41,7 @@ interface RunState {
   mappings: ColumnMapping[];
   rows: LocationRow[];
   flags: Flag[];
+  reconciliation: Reconciliation[];
   total: number;
   error: string | null;
   timeline: TimelineEntry[];
@@ -64,6 +68,15 @@ interface RunState {
 
 function log(kind: TimelineEntry["kind"], message: string): TimelineEntry {
   return { at: Date.now(), kind, message };
+}
+
+/** Flags and tie-out after an edit, so fixing a cell can fix (or break) a reconciliation. */
+function recompute(rows: LocationRow[], mappings: ColumnMapping[], subtotals?: SourceSubtotal[]) {
+  const tieOut = reconcile(rows, subtotals);
+  return {
+    flags: [...rows.flatMap((r) => flagRow(r, mappings)), ...flagAcrossRows(rows, mappings), ...tieOut.flags],
+    reconciliation: tieOut.results,
+  };
 }
 
 function coerce(field: FieldId, text: string, previous: Cell): Cell {
@@ -105,6 +118,7 @@ export const useRun = create<RunState>((set, get) => ({
   mappings: [],
   rows: [],
   flags: [],
+  reconciliation: [],
   total: 0,
   error: null,
   timeline: [],
@@ -145,6 +159,7 @@ export const useRun = create<RunState>((set, get) => ({
       file: parsed,
       rows: [],
       flags: [],
+      reconciliation: [],
       edits: [],
       error: null,
       total: parsed.rows.length,
@@ -154,6 +169,27 @@ export const useRun = create<RunState>((set, get) => ({
       ],
     });
 
+    // Rows arrive faster than a browser should re-render. Buffer them and
+    // commit once per frame: 3,861 rows become a few dozen renders instead of
+    // 3,861, and appending stays linear instead of copying the array each time.
+    let pending: LocationRow[] = [];
+    let frame: number | null = null;
+    const flush = () => {
+      frame = null;
+      if (!pending.length) return;
+      const batch = pending;
+      pending = [];
+      set((state) => ({ rows: state.rows.concat(batch) }));
+    };
+    const queueRow = (row: LocationRow) => {
+      pending.push(row);
+      if (frame === null) frame = requestAnimationFrame(flush);
+    };
+    const flushNow = () => {
+      if (frame !== null) cancelAnimationFrame(frame);
+      flush();
+    };
+
     const handle = streamRun(
       {
         fileName: parsed.fileName,
@@ -161,6 +197,7 @@ export const useRun = create<RunState>((set, get) => ({
         headers: parsed.headers,
         rows: parsed.rows,
         mappings,
+        subtotals: parsed.subtotals,
         chaosDropAfter: get().chaosDrop
           ? Math.ceil(parsed.rows.length / 3)
           : undefined,
@@ -175,17 +212,32 @@ export const useRun = create<RunState>((set, get) => ({
             return;
           }
           if (event.type === "row") {
-            set((state) => ({
-              rows: [...state.rows, event.row],
-              total: event.total,
-            }));
+            queueRow(hydrateRow(event.row as WireRow));
+            if (get().total !== event.total) set({ total: event.total });
             return;
           }
           if (event.type === "flags") {
+            flushNow();
             set({ flags: event.flags });
+            return;
+          }
+          if (event.type === "reconciliation") {
+            const tied = event.results.filter((r) => r.matched).length;
+            set((state) => ({
+              reconciliation: event.results,
+              timeline: [
+                ...state.timeline,
+                log(
+                  tied === event.results.length ? "good" : "warn",
+                  `Tied out ${tied} of ${event.results.length} totals printed in the source`,
+                ),
+              ],
+            }));
           }
         },
-        onInterrupt: ({ lastEventId, attempt, reason }) =>
+        onInterrupt: ({ lastEventId, attempt, reason }) => {
+          // Bank what arrived before the drop so the count in the log is true.
+          flushNow();
           set((state) => ({
             phase: "interrupted",
             timeline: [
@@ -195,7 +247,8 @@ export const useRun = create<RunState>((set, get) => ({
                 `${reason}. Retry ${attempt} from event ${lastEventId}, ${state.rows.length} rows already banked.`,
               ),
             ],
-          })),
+          }));
+        },
         onResume: ({ lastEventId }) =>
           set((state) => ({
             phase: "streaming",
@@ -204,20 +257,24 @@ export const useRun = create<RunState>((set, get) => ({
               log("good", `Resumed at event ${lastEventId}, no rows re-sent`),
             ],
           })),
-        onDone: () =>
+        onDone: () => {
+          flushNow();
           set((state) => ({
             phase: "done",
             timeline: [
               ...state.timeline,
               log("good", `Schedule complete, ${state.rows.length} locations`),
             ],
-          })),
-        onFatal: (message) =>
+          }));
+        },
+        onFatal: (message) => {
+          flushNow();
           set((state) => ({
             phase: "error",
             error: message,
             timeline: [...state.timeline, log("warn", message)],
-          })),
+          }));
+        },
       },
     );
 
@@ -247,14 +304,12 @@ export const useRun = create<RunState>((set, get) => ({
     const rows = state.rows.map((r) =>
       r.key === rowKey ? { ...r, [field]: after } : r,
     );
-    const flags = [
-      ...rows.flatMap((r) => flagRow(r, state.mappings)),
-      ...flagDuplicates(rows),
-    ];
+    const { flags, reconciliation } = recompute(rows, state.mappings, state.file?.subtotals);
 
     set({
       rows,
       flags,
+      reconciliation,
       edits: [...state.edits, { rowKey, field, before, after }],
     });
   },
@@ -267,12 +322,9 @@ export const useRun = create<RunState>((set, get) => ({
     const rows = state.rows.map((r) =>
       r.key === last.rowKey ? { ...r, [last.field]: last.before } : r,
     );
-    const flags = [
-      ...rows.flatMap((r) => flagRow(r, state.mappings)),
-      ...flagDuplicates(rows),
-    ];
+    const { flags, reconciliation } = recompute(rows, state.mappings, state.file?.subtotals);
 
-    set({ rows, flags, edits: state.edits.slice(0, -1) });
+    set({ rows, flags, reconciliation, edits: state.edits.slice(0, -1) });
   },
 
   remap(header, field) {
@@ -295,6 +347,7 @@ export const useRun = create<RunState>((set, get) => ({
       mappings: [],
       rows: [],
       flags: [],
+      reconciliation: [],
       total: 0,
       error: null,
       timeline: [],

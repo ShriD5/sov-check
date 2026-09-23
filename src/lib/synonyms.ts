@@ -15,6 +15,11 @@ export const SYNONYMS: Record<FieldId, string[]> = {
     "bldg", "bldg #", "bldg no", "building", "building #", "building no",
     "building number", "building id", "bld", "structure", "structure #",
   ],
+  description: [
+    "description", "desc", "location name", "location description", "building name",
+    "building description", "bldg description", "bldg desc", "bldg name", "site name",
+    "property name", "facility", "facility name", "premises name", "location desc",
+  ],
   address: [
     "address", "street", "street address", "address 1", "addr", "addr 1",
     "location address", "situs", "situs address", "property address", "street 1",
@@ -34,6 +39,7 @@ export const SYNONYMS: Record<FieldId, string[]> = {
   sq_ft: [
     "sq ft", "sqft", "square feet", "square footage", "total sq ft", "total area",
     "area", "floor area", "gross area", "building area", "sf", "total sf", "gross sq ft",
+    "footage", "square foot", "sq footage", "total square footage",
   ],
   construction: [
     "construction", "const", "constr", "construction type", "const type",
@@ -52,6 +58,7 @@ export const SYNONYMS: Record<FieldId, string[]> = {
   roof_year: [
     "roof year", "year roof", "roof updated", "roof update year",
     "year roof updated", "roof replaced", "roof age year", "last roof update",
+    "roofing year", "roof yr", "roofing yr",
   ],
   protection_class: [
     "protection class", "prot class", "ppc", "iso ppc", "fire protection class",

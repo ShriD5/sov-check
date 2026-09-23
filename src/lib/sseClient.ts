@@ -18,6 +18,24 @@ const MAX_ATTEMPTS = 6;
 const BASE_BACKOFF_MS = 400;
 
 /**
+ * Gzips the request once, up front. Every retry re-sends the rows (the stream
+ * is stateless), so this is paid once rather than on every reconnect, and it
+ * keeps a 4MB schedule far under the platform's request limit.
+ */
+async function encodeBody(payload: ExtractRequest): Promise<{ body: BodyInit; headers: Record<string, string> }> {
+  const json = JSON.stringify(payload);
+  if (typeof CompressionStream === "undefined") {
+    return { body: json, headers: { "content-type": "application/json" } };
+  }
+  const stream = new Blob([json]).stream().pipeThrough(new CompressionStream("gzip"));
+  const gz = await new Response(stream).arrayBuffer();
+  return {
+    body: gz,
+    headers: { "content-type": "application/json", "x-body-encoding": "gzip" },
+  };
+}
+
+/**
  * SSE over fetch rather than EventSource, for four things the browser API
  * cannot give us: a POST body, an AbortController so a superseded run stops
  * immediately, an explicit Last-Event-ID we control on every retry, and a
@@ -28,6 +46,7 @@ export function streamRun(payload: ExtractRequest, callbacks: StreamCallbacks): 
   let lastEventId = 0;
   let attempt = 0;
   let controller: AbortController | null = null;
+  const encoded = encodeBody(payload);
 
   const cancel = (reason = "cancelled") => {
     if (cancelled) return;
@@ -42,14 +61,15 @@ export function streamRun(payload: ExtractRequest, callbacks: StreamCallbacks): 
     let sawTerminal = false;
 
     try {
+      const { body, headers } = await encoded;
       const response = await fetch("/api/stream", {
         method: "POST",
         signal: controller.signal,
         headers: {
-          "content-type": "application/json",
+          ...headers,
           ...(lastEventId > 0 ? { "Last-Event-ID": String(lastEventId) } : {}),
         },
-        body: JSON.stringify({ ...payload, lastEventId }),
+        body,
       });
 
       if (!response.ok || !response.body) {

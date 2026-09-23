@@ -1,12 +1,20 @@
-import { flagDuplicates, flagRow } from "./flags.js";
+import { flagAcrossRows, flagRow, reconcile } from "./flags.js";
 import { mapHeaders } from "./mapHeaders.js";
 import { normalizeRow } from "./normalize.js";
-import type { ColumnMapping, ExtractRequest, Flag, LocationRow, StreamEvent } from "./types.js";
+import type {
+  ColumnMapping,
+  ExtractRequest,
+  Flag,
+  LocationRow,
+  Reconciliation,
+  StreamEvent,
+} from "./types.js";
 
 export interface EngineResult {
   mappings: ColumnMapping[];
   rows: LocationRow[];
   flags: Flag[];
+  reconciliation: Reconciliation[];
 }
 
 /**
@@ -14,11 +22,18 @@ export interface EngineResult {
  * the eval harness runs it in one shot. Same code path either way, so what
  * the eval measures is what the app ships.
  */
-export function extractAll(req: Pick<ExtractRequest, "headers" | "rows" | "mappings">): EngineResult {
+export function extractAll(
+  req: Pick<ExtractRequest, "headers" | "rows" | "mappings" | "subtotals">,
+): EngineResult {
   const mappings = req.mappings?.length ? req.mappings : mapHeaders(req.headers, req.rows);
   const rows = req.rows.map((raw, i) => normalizeRow(raw, mappings, i));
-  const flags = [...rows.flatMap((row) => flagRow(row, mappings)), ...flagDuplicates(rows)];
-  return { mappings, rows, flags };
+  const tieOut = reconcile(rows, req.subtotals);
+  const flags = [
+    ...rows.flatMap((row) => flagRow(row, mappings)),
+    ...flagAcrossRows(rows, mappings),
+    ...tieOut.flags,
+  ];
+  return { mappings, rows, flags, reconciliation: tieOut.results };
 }
 
 /**
@@ -27,7 +42,7 @@ export function extractAll(req: Pick<ExtractRequest, "headers" | "rows" | "mappi
  * for 38 onward and gets exactly the events it missed, no duplicates.
  */
 export function buildEvents(req: ExtractRequest): StreamEvent[] {
-  const { mappings, rows, flags } = extractAll(req);
+  const { mappings, rows, flags, reconciliation } = extractAll(req);
   const events: StreamEvent[] = [{ type: "mapping", mappings }];
 
   rows.forEach((row, index) => {
@@ -35,6 +50,7 @@ export function buildEvents(req: ExtractRequest): StreamEvent[] {
   });
 
   events.push({ type: "flags", flags });
+  if (reconciliation.length) events.push({ type: "reconciliation", results: reconciliation });
   events.push({ type: "done", emitted: rows.length, total: rows.length });
 
   return events;

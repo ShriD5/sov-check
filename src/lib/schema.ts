@@ -3,6 +3,7 @@ import type { FieldDef, FieldId } from "./types.js";
 export const FIELDS: FieldDef[] = [
   { id: "location_id", label: "Loc #", kind: "string", group: "identity" },
   { id: "building_id", label: "Bldg #", kind: "string", group: "identity" },
+  { id: "description", label: "Description", kind: "string", group: "identity" },
   { id: "address", label: "Address", kind: "string", group: "location" },
   { id: "city", label: "City", kind: "string", group: "location" },
   { id: "state", label: "State", kind: "string", group: "location" },
@@ -70,6 +71,25 @@ export const US_STATES = new Set(
     "NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY DC PR VI GU AS MP")
     .split(" "),
 );
+
+/**
+ * First digit of a US zip code to the states it can belong to. Coarse, but it
+ * catches the transposition that matters: a Massachusetts building with a New
+ * York zip is a typo, and a typo in the zip moves the risk to another coast
+ * for any cat model downstream.
+ */
+export const ZIP_PREFIX_STATES: Record<string, string[]> = {
+  "0": ["CT", "MA", "ME", "NH", "NJ", "PR", "RI", "VT", "VI"],
+  "1": ["DE", "NY", "PA"],
+  "2": ["DC", "MD", "NC", "SC", "VA", "WV"],
+  "3": ["AL", "FL", "GA", "MS", "TN"],
+  "4": ["IN", "KY", "MI", "OH"],
+  "5": ["IA", "MN", "MT", "ND", "SD", "WI"],
+  "6": ["IL", "KS", "MO", "NE"],
+  "7": ["AR", "LA", "OK", "TX"],
+  "8": ["AZ", "CO", "ID", "NM", "NV", "UT", "WY"],
+  "9": ["AK", "CA", "HI", "OR", "WA", "GU", "AS", "MP"],
+};
 
 export const STATE_NAMES: Record<string, string> = {
   alabama: "AL", alaska: "AK", arizona: "AZ", arkansas: "AR", california: "CA",

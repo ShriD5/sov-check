@@ -1,47 +1,61 @@
 /**
- * End-to-end check against a running dev server. Exercises the real wire
- * protocol: POST /api/extract, consume SSE, have the server drop the
- * connection mid-stream, reconnect with Last-Event-ID, and assert the
- * schedule matches the run that was never interrupted.
+ * End-to-end check against a running server. Exercises the real wire
+ * protocol: gzipped POST, SSE, the server dropping the connection
+ * mid-stream, a reconnect with Last-Event-ID, and a schedule that must match
+ * the run that was never interrupted.
  *
  *   npm run dev          # in one terminal
  *   npx tsx scripts/smoke.ts
+ *   SOV_BASE=https://sov-check.vercel.app npx tsx scripts/smoke.ts
  */
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { gzipSync } from "node:zlib";
 import { parseWorkbook } from "../src/lib/parse/sheet.js";
-import type { LocationRow, StreamEvent } from "../src/lib/types.js";
+import { extractFromPdfDocument, type PdfLikeDocument } from "../src/lib/parse/pdf.js";
+import { hydrateRow, type WireRow } from "../src/lib/wire.js";
+import type { ExtractRequest, LocationRow, ParsedFile, Reconciliation, StreamEvent } from "../src/lib/types.js";
 
 const BASE = process.env.SOV_BASE ?? "http://127.0.0.1:5173";
 const here = dirname(fileURLToPath(import.meta.url));
-const fixture = join(here, "..", "fixtures", "files", "05-thousands.xlsx");
 
-function load() {
-  const buffer = readFileSync(fixture);
+function loadSheet(file: string): ParsedFile {
+  const buffer = readFileSync(join(here, "..", "fixtures", "files", file));
   return parseWorkbook(
     buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer,
-    "05-thousands.xlsx",
+    file,
   );
 }
 
-/** Reads one SSE connection to completion or death. Returns what it got. */
-async function readStream(lastEventId: number, chaos: { drop?: number } = {}) {
-  const parsed = load();
+async function loadPdf(path: string, name: string): Promise<ParsedFile> {
+  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const doc = await pdfjs.getDocument({ data: new Uint8Array(readFileSync(path)), verbosity: 0 }).promise;
+  return extractFromPdfDocument(doc as unknown as PdfLikeDocument, name);
+}
+
+function payloadOf(parsed: ParsedFile, extra: Partial<ExtractRequest> = {}): ExtractRequest {
+  return {
+    fileName: parsed.fileName,
+    kind: parsed.kind,
+    headers: parsed.headers,
+    rows: parsed.rows,
+    subtotals: parsed.subtotals,
+    ...extra,
+  };
+}
+
+/** Reads one SSE connection to completion or death. */
+async function readStream(payload: ExtractRequest, lastEventId: number, gzip: boolean) {
+  const json = JSON.stringify(payload);
   const res = await fetch(`${BASE}/api/stream`, {
     method: "POST",
     headers: {
       "content-type": "application/json",
+      ...(gzip ? { "x-body-encoding": "gzip" } : {}),
       ...(lastEventId ? { "Last-Event-ID": String(lastEventId) } : {}),
     },
-    body: JSON.stringify({
-      fileName: parsed.fileName,
-      kind: parsed.kind,
-      headers: parsed.headers,
-      rows: parsed.rows,
-      lastEventId,
-      chaosDropAfter: chaos.drop,
-    }),
+    body: gzip ? gzipSync(json) : json,
   });
   if (!res.ok || !res.body) throw new Error(`stream failed: ${res.status} ${await res.text()}`);
 
@@ -51,6 +65,7 @@ async function readStream(lastEventId: number, chaos: { drop?: number } = {}) {
   let lastId = lastEventId;
   let sawDone = false;
   const rows: LocationRow[] = [];
+  let reconciliation: Reconciliation[] = [];
 
   while (true) {
     const { done, value } = await reader.read();
@@ -70,48 +85,65 @@ async function readStream(lastEventId: number, chaos: { drop?: number } = {}) {
       if (!data) continue;
       const event = JSON.parse(data) as StreamEvent;
       lastId = id;
-      if (event.type === "row") rows.push(event.row);
+      if (event.type === "row") rows.push(hydrateRow(event.row as WireRow));
+      if (event.type === "reconciliation") reconciliation = event.results;
       if (event.type === "done") sawDone = true;
     }
   }
 
-  return { rows, lastId, sawDone };
+  return { rows, lastId, sawDone, reconciliation, wireBytes: gzip ? gzipSync(json).length : json.length };
+}
+
+type Check = [string, boolean, string];
+
+async function scenario(name: string, parsed: ParsedFile, dropAfter: number, gzip: boolean): Promise<Check[]> {
+  const checks: Check[] = [];
+  const started = performance.now();
+
+  const clean = await readStream(payloadOf(parsed), 0, gzip);
+  const cleanMs = Math.round(performance.now() - started);
+  checks.push([`${name}: clean run reaches done`, clean.sawDone, `${clean.rows.length} rows in ${cleanMs}ms, body ${(clean.wireBytes / 1e6).toFixed(2)}MB`]);
+
+  const first = await readStream(payloadOf(parsed, { chaosDropAfter: dropAfter }), 0, gzip);
+  checks.push([`${name}: first leg dies without done`, !first.sawDone && first.rows.length > 0, `${first.rows.length} rows banked`]);
+
+  // The resume may land on a different serverless instance. It has to work anyway.
+  const second = await readStream(payloadOf(parsed), first.lastId, gzip);
+  checks.push([`${name}: resumed leg reaches done`, second.sawDone, `resumed at event ${first.lastId}`]);
+
+  const stitched = [...first.rows, ...second.rows];
+  const unique = new Set(stitched.map((r) => r.key)).size;
+  checks.push([`${name}: no row delivered twice`, unique === stitched.length, `${stitched.length} rows, ${unique} unique`]);
+  checks.push([
+    `${name}: resumed schedule identical to clean`,
+    JSON.stringify(stitched) === JSON.stringify(clean.rows),
+    `${stitched.length} vs ${clean.rows.length}`,
+  ]);
+
+  if (clean.reconciliation.length) {
+    const tied = clean.reconciliation.filter((r) => r.matched).length;
+    checks.push([
+      `${name}: ties out to the source's own totals`,
+      tied === clean.reconciliation.length,
+      `${tied}/${clean.reconciliation.length}`,
+    ]);
+  }
+
+  return checks;
 }
 
 async function main() {
-  const checks: [string, boolean, string][] = [];
+  const checks: Check[] = [];
 
-  // Clean run.
-  const clean = await readStream(0);
-  checks.push(["clean run reaches done", clean.sawDone, `sawDone=${clean.sawDone}`]);
-  checks.push(["clean run returns 21 rows", clean.rows.length === 21, `${clean.rows.length} rows`]);
+  checks.push(...(await scenario("synthetic $000s", loadSheet("05-thousands.xlsx"), 8, false)));
 
-  // Interrupted run: server kills the connection after 8 events.
-  const firstLeg = await readStream(0, { drop: 8 });
-  checks.push([
-    "first leg dies without done",
-    !firstLeg.sawDone && firstLeg.rows.length > 0,
-    `${firstLeg.rows.length} rows, sawDone=${firstLeg.sawDone}`,
-  ]);
+  const ms = join(here, "..", "fixtures", "real", "mississippi.pdf");
+  if (existsSync(ms)) {
+    checks.push(...(await scenario("State of Mississippi", await loadPdf(ms, "mississippi.pdf"), 1200, true)));
+  } else {
+    console.log("  (skipping Mississippi: run scripts/fetch-real.sh first)");
+  }
 
-  // Resume lands on a different serverless instance than the first leg; the
-  // point of the stateless design is that this still works.
-  const secondLeg = await readStream(firstLeg.lastId);
-  checks.push(["resumed leg reaches done", secondLeg.sawDone, `sawDone=${secondLeg.sawDone}`]);
-
-  const stitched = [...firstLeg.rows, ...secondLeg.rows];
-  checks.push([
-    "no row delivered twice across the resume",
-    new Set(stitched.map((r) => r.key)).size === stitched.length,
-    `${stitched.length} rows, ${new Set(stitched.map((r) => r.key)).size} unique`,
-  ]);
-  checks.push([
-    "resumed schedule is identical to the clean one",
-    JSON.stringify(stitched) === JSON.stringify(clean.rows),
-    `${stitched.length} vs ${clean.rows.length} rows`,
-  ]);
-
-  // A malformed body is a clean 400, not a hang.
   const bad = await fetch(`${BASE}/api/stream`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -119,11 +151,11 @@ async function main() {
   });
   checks.push(["malformed body returns 400", bad.status === 400, `status ${bad.status}`]);
 
-  console.log("\nSOV Check smoke test against " + BASE + "\n");
+  console.log(`\nSOV Check smoke test against ${BASE}\n`);
   let failed = 0;
-  for (const [name, pass, detail] of checks) {
+  for (const [label, pass, detail] of checks) {
     if (!pass) failed++;
-    console.log(`  ${pass ? "ok  " : "FAIL"}  ${name.padEnd(46)} ${detail}`);
+    console.log(`  ${pass ? "ok  " : "FAIL"}  ${label.padEnd(54)} ${detail}`);
   }
   console.log(`\n  ${checks.length - failed}/${checks.length} passed\n`);
   if (failed) process.exitCode = 1;

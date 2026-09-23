@@ -6,6 +6,7 @@ export type SourceRef =
 export type FieldId =
   | "location_id"
   | "building_id"
+  | "description"
   | "address"
   | "city"
   | "state"
@@ -62,12 +63,16 @@ export interface Flag {
   level: FlagLevel;
   code:
     | "missing_cope"
+    | "cope_not_in_file"
     | "tiv_mismatch"
     | "duplicate_location"
     | "year_out_of_range"
     | "bad_state"
     | "bad_zip"
-    | "unit_ambiguous"
+    | "zip_state_mismatch"
+    | "psf_outlier"
+    | "zero_tiv"
+    | "subtotal_mismatch"
     | "low_confidence_mapping"
     | "no_tiv";
   message: string;
@@ -93,6 +98,32 @@ export interface ColumnMapping {
   scale?: number;
 }
 
+/**
+ * A total or subtotal the source document printed about itself. Kept rather
+ * than discarded so the extracted schedule can be tied out against the
+ * file's own arithmetic, the way an underwriter reconciles a schedule.
+ */
+export interface SourceSubtotal {
+  label: string;
+  /** Every figure on the total line; which one is TIV is decided at reconciliation. */
+  amounts: number[];
+  /** Rows [startRow, endRow) the total closes. */
+  startRow: number;
+  endRow: number;
+  where: string;
+}
+
+export interface Reconciliation {
+  label: string;
+  where: string;
+  rows: number;
+  /** Which schedule column the source figure matched, or null if none did. */
+  matched: "tiv" | "building_value" | "contents_value" | null;
+  sourceAmount: number;
+  scheduleAmount: number;
+  diff: number;
+}
+
 export interface ParsedFile {
   fileName: string;
   kind: "xlsx" | "csv" | "pdf";
@@ -101,6 +132,7 @@ export interface ParsedFile {
   rows: RawRow[];
   /** Notes surfaced to the user, e.g. "merged header rows collapsed". */
   notes: string[];
+  subtotals?: SourceSubtotal[];
 }
 
 /** Server-sent event payloads. */
@@ -108,6 +140,7 @@ export type StreamEvent =
   | { type: "mapping"; mappings: ColumnMapping[] }
   | { type: "row"; row: LocationRow; index: number; total: number }
   | { type: "flags"; flags: Flag[] }
+  | { type: "reconciliation"; results: Reconciliation[] }
   | { type: "done"; emitted: number; total: number }
   | { type: "error"; message: string; retryable: boolean };
 
@@ -118,6 +151,7 @@ export interface ExtractRequest {
   rows: RawRow[];
   /** Present when the user confirmed or corrected the mapping. */
   mappings?: ColumnMapping[];
+  subtotals?: SourceSubtotal[];
   /** Dev/demo only: make the server drop the stream after N rows. */
   chaosDropAfter?: number;
   /** Dev/demo only: make the server truncate its own output after N rows. */

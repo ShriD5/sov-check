@@ -9,6 +9,8 @@
     "preview": "vite preview",
     "fixtures": "tsx fixtures/generate.ts",
     "eval": "tsx scripts/eval.ts",
+    "real": "bash scripts/fetch-real.sh && tsx scripts/real.ts",
+    "smoke": "tsx scripts/smoke.ts",
     "typecheck": "tsc -b --noEmit false --emitDeclarationOnly false"
   },
   "dependencies": {

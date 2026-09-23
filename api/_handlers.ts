@@ -1,4 +1,5 @@
 import { buildEvents } from "../src/lib/engine.js";
+import { compactRow } from "../src/lib/wire.js";
 import type { ExtractRequest } from "../src/lib/types.js";
 
 export interface MiniRes {
@@ -11,8 +12,17 @@ export interface MiniRes {
 
 const MAX_ROWS = 5000;
 
-/** Per-row delay so the stream is observable, and so resume has something to resume. */
-const ROW_DELAY_MS = Number(process.env.SOV_ROW_DELAY_MS ?? 45);
+/**
+ * Per-row pacing so the stream is observable and a resume has something to
+ * resume, scaled so the whole schedule takes a few seconds whatever its size.
+ * A flat 45ms per row is pleasant for 21 rows and three minutes for 3,861.
+ */
+const MAX_ROW_DELAY_MS = Number(process.env.SOV_ROW_DELAY_MS ?? 45);
+const TARGET_STREAM_MS = 6000;
+
+function rowDelay(rows: number): number {
+  return Math.min(MAX_ROW_DELAY_MS, Math.floor(TARGET_STREAM_MS / Math.max(1, rows)));
+}
 
 function fail(res: MiniRes, code: number, message: string) {
   res.status(code);
@@ -30,7 +40,7 @@ function fail(res: MiniRes, code: number, message: string) {
  * cold start, which on serverless is most of the time. Trading a re-POST of
  * the rows for a resume that always works is the right way round.
  */
-export function handleStream(body: unknown, res: MiniRes): void {
+export function handleStream(body: unknown, res: MiniRes, headerLastEventId = 0): void {
   const req = body as (ExtractRequest & { lastEventId?: number }) | undefined;
 
   if (!req || !Array.isArray(req.rows) || !Array.isArray(req.headers)) {
@@ -67,7 +77,10 @@ export function handleStream(body: unknown, res: MiniRes): void {
 
   // Event ids are 1-based and index directly into the event list, so picking
   // up from `lastEventId` sends exactly what the client missed, no more.
-  const lastEventId = Math.max(0, Number(req.lastEventId ?? 0) || 0);
+  // The header wins: the client compresses the body once and reuses it on
+  // every retry, so the resume position cannot live inside it.
+  const lastEventId = Math.max(0, headerLastEventId || Number(req.lastEventId ?? 0) || 0);
+  const delay = rowDelay(req.rows.length);
   let cursor = Math.min(lastEventId, events.length);
   let emittedThisConnection = 0;
   const isResume = lastEventId > 0;
@@ -103,9 +116,10 @@ export function handleStream(body: unknown, res: MiniRes): void {
     const event = events[cursor];
     cursor += 1;
     emittedThisConnection += 1;
-    send(cursor, event);
+    send(cursor, event.type === "row" ? { ...event, row: compactRow(event.row) } : event);
 
-    setTimeout(pump, event.type === "row" ? ROW_DELAY_MS : 0);
+    if (event.type === "row" && delay > 0) setTimeout(pump, delay);
+    else setImmediate(pump);
   };
 
   pump();

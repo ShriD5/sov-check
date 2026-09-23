@@ -7,6 +7,7 @@ import type { Cell, FieldId, LocationRow } from "../lib/types.js";
 const COL_WIDTH: Partial<Record<FieldId, number>> = {
   location_id: 70,
   building_id: 70,
+  description: 180,
   address: 210,
   city: 120,
   state: 60,

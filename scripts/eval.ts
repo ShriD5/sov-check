@@ -120,6 +120,8 @@ async function main() {
   let totalColumns = 0;
   let totalUnmapped = 0;
   let wrongMappings = 0;
+  let totalTotals = 0;
+  let tiedTotals = 0;
 
   console.log("\nSOV Check eval\n");
 
@@ -129,7 +131,13 @@ async function main() {
       readFileSync(join(filesDir, testCase.file.replace(/\.(xlsx|pdf)$/, ".expected.json")), "utf8"),
     ) as Expected;
 
-    const { rows, flags, mappings } = extractAll({ headers: parsed.headers, rows: parsed.rows });
+    const { rows, flags, mappings, reconciliation } = extractAll({
+      headers: parsed.headers,
+      rows: parsed.rows,
+      subtotals: parsed.subtotals,
+    });
+    totalTotals += reconciliation.length;
+    tiedTotals += reconciliation.filter((r) => r.matched).length;
     const unmapped = mappings.filter((m) => !m.field).length;
     totalColumns += mappings.length;
     totalUnmapped += unmapped;
@@ -237,11 +245,16 @@ async function main() {
   console.log(`  Wrong answers                                 ${wrongMappings}`);
   console.log(`  Columns handed back for mapping               ${totalUnmapped}/${totalColumns}`);
   console.log(`  Expected flags raised                         ${flagPasses}/${flagChecks}`);
+  console.log(`  Source totals tied out to the dollar          ${tiedTotals}/${totalTotals}`);
   console.log(`  Chaos resume identical to clean run           ${chaosPasses}/${chaosRuns}`);
   console.log("");
 
   // A deferred column is recoverable, a wrong number is not. Wrong fails the run.
-  const ok = wrongMappings === 0 && chaosPasses === chaosRuns && flagPasses === flagChecks;
+  const ok =
+    wrongMappings === 0 &&
+    chaosPasses === chaosRuns &&
+    flagPasses === flagChecks &&
+    tiedTotals === totalTotals;
   if (!ok) process.exitCode = 1;
 }
 

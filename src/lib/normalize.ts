@@ -58,6 +58,11 @@ export function parseBool(raw: string): { value: boolean | null; clean: boolean 
   return { value: null, clean: false };
 }
 
+/** Every construction phrase we know, squashed and sorted longest first. */
+const CONSTRUCTION_PHRASES = CONSTRUCTION_CLASSES.flatMap((cls) =>
+  cls.match.map((m) => ({ cls, phrase: m.replace(/[^a-z0-9]/g, "") })),
+).sort((a, b) => b.phrase.length - a.phrase.length);
+
 export function parseConstruction(raw: string): { value: string | null; clean: boolean } {
   const text = raw.trim().toLowerCase();
   if (isEmpty(text)) return { value: null, clean: true };
@@ -68,12 +73,19 @@ export function parseConstruction(raw: string): { value: string | null; clean: b
     return { value: `${hit.code} ${hit.label}`, clean: true };
   }
 
-  for (const cls of CONSTRUCTION_CLASSES) {
-    if (cls.match.some((m) => text === m)) return { value: `${cls.code} ${cls.label}`, clean: true };
-  }
-  for (const cls of CONSTRUCTION_CLASSES) {
-    if (cls.match.some((m) => text.includes(m))) return { value: `${cls.code} ${cls.label}`, clean: false };
-  }
+  // "Masonry Noncombustible", "masonry non-combustible" and "Masonry NC" are
+  // the same class. Compare with punctuation and spaces squashed, and try the
+  // longest phrase first: otherwise a bare "masonry" (class 2) wins against
+  // "masonry noncombustible" (class 4), which is exactly what the Town of
+  // Ware's real SOV exposed.
+  const squashed = text.replace(/[^a-z0-9]/g, "");
+
+  const exact = CONSTRUCTION_PHRASES.find((p) => p.phrase === squashed);
+  if (exact) return { value: `${exact.cls.code} ${exact.cls.label}`, clean: true };
+
+  const partial = CONSTRUCTION_PHRASES.find((p) => p.phrase.length >= 4 && squashed.includes(p.phrase));
+  if (partial) return { value: `${partial.cls.code} ${partial.cls.label}`, clean: false };
+
   return { value: raw.trim(), clean: false };
 }
 
@@ -82,8 +94,17 @@ export function parseState(raw: string): { value: string | null; clean: boolean 
   if (isEmpty(text)) return { value: null, clean: true };
   const upper = text.toUpperCase();
   if (US_STATES.has(upper)) return { value: upper, clean: true };
-  const byName = STATE_NAMES[text.toLowerCase()];
+  const lower = text.toLowerCase();
+  const byName = STATE_NAMES[lower];
   if (byName) return { value: byName, clean: false };
+
+  // Report writers truncate columns: the Mississippi SOV prints "Missi". A
+  // prefix of four or more letters that fits exactly one state name is that
+  // state; one that fits two ("New ") is left alone and flagged.
+  if (lower.length >= 4) {
+    const hits = Object.entries(STATE_NAMES).filter(([name]) => name.startsWith(lower));
+    if (hits.length === 1) return { value: hits[0][1], clean: false };
+  }
   return { value: upper, clean: false };
 }
 

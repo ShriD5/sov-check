@@ -92,12 +92,17 @@ export function FlagsPanel() {
   const flags = useRun((s) => s.flags);
   const select = useRun((s) => s.select);
 
+  // Group by issue and field: "Year built is missing" and "Construction is
+  // missing" are different problems even though they share a code.
   const grouped = flags.reduce<Record<string, typeof flags>>((acc, flag) => {
-    (acc[flag.code] ??= []).push(flag);
+    (acc[`${flag.code}:${flag.field ?? ""}`] ??= []).push(flag);
     return acc;
   }, {});
 
-  const order = Object.entries(grouped).sort((a, b) => b[1].length - a[1].length);
+  const rank = { error: 0, warn: 1, info: 2 } as const;
+  const order = Object.entries(grouped).sort(
+    (a, b) => rank[a[1][0].level] - rank[b[1][0].level] || b[1].length - a[1].length,
+  );
 
   if (!flags.length) {
     return (
@@ -124,11 +129,11 @@ export function FlagsPanel() {
               {group[0].message}
             </span>
             <span className="ml-3 shrink-0 text-xs text-[var(--color-muted)]">
-              {group.length} row{group.length > 1 ? "s" : ""}
+              {group[0].field === null ? "whole file" : `${group.length} row${group.length > 1 ? "s" : ""}`}
             </span>
           </div>
           <div className="flex flex-wrap gap-1 px-4 pb-2">
-            {group.slice(0, 12).map((flag) => (
+            {group[0].field !== null && group.slice(0, 12).map((flag) => (
               <button
                 key={flag.id}
                 onClick={() => flag.field && select(flag.rowKey, flag.field)}
@@ -137,7 +142,7 @@ export function FlagsPanel() {
                 {flag.rowKey.split(":").slice(1, 3).join("/")}
               </button>
             ))}
-            {group.length > 12 && (
+            {group[0].field !== null && group.length > 12 && (
               <span className="px-1 py-0.5 text-[11px] text-[var(--color-muted)]">
                 +{group.length - 12} more
               </span>
