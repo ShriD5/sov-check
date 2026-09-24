@@ -6,6 +6,10 @@ TIV, COPE, gaps flagged, and every value traced to the cell it came from.
 Free, no login, nothing stored. Built by [Shrithan Devaiah](https://shrithan.site).
 Not affiliated with any insurance software vendor.
 
+[Watch the 90-second demo](https://sov-check.vercel.app/demo.mp4): the State of
+Mississippi's real SOV tied out 49/49, a typo caught in the Town of Ware's, and
+the stream cut on purpose and resumed.
+
 ---
 
 ## Why this exists

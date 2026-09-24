@@ -59,12 +59,20 @@ export default function App() {
               Messy Statement of Values in, clean property schedule out
             </p>
           </div>
-          <a
-            href="https://github.com/ShriD5/sov-check"
-            className="text-sm text-[var(--color-muted)] underline-offset-4 hover:text-white hover:underline"
-          >
-            source
-          </a>
+          <div className="flex items-baseline gap-4">
+            <a
+              href="/demo.mp4"
+              className="text-sm text-[var(--color-muted)] underline-offset-4 hover:text-white hover:underline"
+            >
+              90-second demo
+            </a>
+            <a
+              href="https://github.com/ShriD5/sov-check"
+              className="text-sm text-[var(--color-muted)] underline-offset-4 hover:text-white hover:underline"
+            >
+              source
+            </a>
+          </div>
         </div>
       </header>
 
